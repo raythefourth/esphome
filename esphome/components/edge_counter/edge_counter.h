@@ -10,6 +10,7 @@ namespace edge_counter {
 struct EdgeCounterSensorStore {
   volatile uint32_t edge_count{0};
   volatile uint32_t last_time{0};
+  volatile int32_t duration_buffer[100];  // 400 kB, signed!
   volatile bool is_high{false};
   volatile bool last_level{false};
   ISRInternalGPIOPin rx_pin;
