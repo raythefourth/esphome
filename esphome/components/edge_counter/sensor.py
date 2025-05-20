@@ -1,8 +1,8 @@
+from esphome import pins
 import esphome.codegen as cg
 from esphome.components import sensor
 import esphome.config_validation as cv
-from esphome.const import CONF_ID, CONF_RX_PIN, CONF_TX_PIN
-from esphome.pins import PIN_SCHEMA_FOR_INPUT, PIN_SCHEMA_FOR_OUTPUT
+from esphome.const import CONF_RX_PIN, CONF_TX_PIN
 
 edge_counter_ns = cg.esphome_ns.namespace("edge_counter")
 EdgeCounterSensor = edge_counter_ns.class_(
@@ -15,10 +15,8 @@ CONFIG_SCHEMA = (
     )
     .extend(
         {
-            cv.Required(
-                CONF_RX_PIN
-            ): PIN_SCHEMA_FOR_INPUT,  # Input pin for edge detection
-            cv.Required(CONF_TX_PIN): PIN_SCHEMA_FOR_OUTPUT,  # Output pin for toggling
+            cv.Required(CONF_RX_PIN): cv.All(pins.internal_gpio_input_pin_schema),
+            cv.Required(CONF_TX_PIN): cv.All(pins.internal_gpio_output_pin_schema),
         }
     )
     .extend(cv.COMPONENT_SCHEMA)
@@ -26,14 +24,11 @@ CONFIG_SCHEMA = (
 
 
 async def to_code(config):
-    var = cg.new_Pvariable(config[CONF_ID])
+    var = await sensor.new_sensor(config)
     await cg.register_component(var, config)
-    await sensor.register_sensor(var, config)
 
     rx_pin = await cg.gpio_pin_expression(config[CONF_RX_PIN])
     cg.add(var.set_rx_pin(rx_pin))
 
-    tx_pin = await cg.gpio_pin_expression(
-        config[CONF_TX_PIN]
-    )  # just like uart __init.py__
-    cg.add(var.set_tx_pin(tx_pin))  # just like uart __init.py__
+    tx_pin = await cg.gpio_pin_expression(config[CONF_TX_PIN])
+    cg.add(var.set_tx_pin(tx_pin))

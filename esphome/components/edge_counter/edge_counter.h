@@ -4,34 +4,35 @@
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/core/hal.h"
 
-#ifdef USE_ESP_IDF
-#include "driver/gpio.h"
-#endif
-
 namespace esphome {
 namespace edge_counter {
 
-class EdgeCounterSensor : public sensor::Sensor, public PollingComponent {
+struct EdgeCounterSensorStore {
+  volatile uint32_t edge_count{0};
+  volatile uint32_t last_time{0};
+  volatile bool is_high{false};
+  volatile bool last_level{false};
+  ISRInternalGPIOPin rx_pin;
+
+  static void gpio_intr(EdgeCounterSensorStore *arg);
+};
+
+class EdgeCounterSensor : public sensor::Sensor, public Component {
  public:
-  // Constructor now takes two pins
-  EdgeCounterSensor(InternalGPIOPin *rx_pin, InternalGPIOPin *tx_pin);
+  void set_rx_pin(InternalGPIOPin *rx_pin) { this->rx_pin_ = rx_pin; }
+  void set_tx_pin(InternalGPIOPin *tx_pin) { this->tx_pin_ = tx_pin; }
 
   void setup() override;
-  void loop() override;
-  void update() override;
-  void dump_config() override;
   float get_setup_priority() const override;
-
-  static void IRAM_ATTR gpio_intr_handler(void *arg);
+  void dump_config() override;
+  void loop() override;
 
  protected:
-  InternalGPIOPin *rx_pin_;  // Renamed from pin_
-  InternalGPIOPin *tx_pin_;  // New output pin
+  InternalGPIOPin *rx_pin_;
+  InternalGPIOPin *tx_pin_;
 
-  volatile uint32_t counter_{0};
-  volatile bool new_value_ready_{false};
-  uint32_t last_published_value_{0};
-  bool tx_pin_current_state_{false};  // To store the current state of the tx_pin (false = LOW, true = HIGH)
+  EdgeCounterSensorStore store_{};
+  uint32_t last_edge_count_{0};
 };
 
 }  // namespace edge_counter
