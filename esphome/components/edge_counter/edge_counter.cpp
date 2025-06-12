@@ -14,9 +14,37 @@ void EdgeCounterSensor::setup() {
 
   this->rx_pin_->attach_interrupt(EdgeCounterSensorStore::gpio_intr, &this->store_, gpio::INTERRUPT_ANY_EDGE);
 
-  // this->tx_pin_->set_flags(gpio::FLAG_OUTPUT);
-  // this->tx_pin_->setup();
-  // this->tx_pin_->digital_write(this->tx_pin_current_state_);
+  this->tx_pin_->setup();
+  this->tx_pin_->digital_write(false);
+
+  // test wakeup
+  delayMicroseconds(10000);
+  this->tx_pin_->digital_write(true);  // begin bit 1
+  delayMicroseconds(3400);
+  this->tx_pin_->digital_write(false);  // end of bit 1, start of 2
+  /** Additional bits to send manually
+  delayMicroseconds(98600);             // 29 bits = 98.6ms
+  this->tx_pin_->digital_write(true);   // start bit 30 (data update)
+  delayMicroseconds(3400);
+  this->tx_pin_->digital_write(false);  // end bit 30, start of 31
+  delayMicroseconds(6800);              // 2 bits
+  this->tx_pin_->digital_write(true);   // start bit 33 (heat mode enable)
+  delayMicroseconds(3400);
+  this->tx_pin_->digital_write(false);  // end bit 33, start of 34
+  delayMicroseconds(13600);             // 4 bits
+  this->tx_pin_->digital_write(true);   // start bit 38 (fan low)
+  delayMicroseconds(3400);
+  this->tx_pin_->digital_write(false);  // end bit 38, start of 39
+  delayMicroseconds(6800);              // 2 bits
+  // heating set point 55 deg F = 0100 0000 = 0x40 hex
+  this->tx_pin_->digital_write(true);  // start bit 40
+  delayMicroseconds(3400);
+  this->tx_pin_->digital_write(false);  // end bit 40, start of 41
+  delayMicroseconds(20400);             // 6 bits
+  this->tx_pin_->digital_write(true);   // start bit 47 (fan speed update)
+  delayMicroseconds(3400);
+  this->tx_pin_->digital_write(false);  // end bit 47
+  **/
 }
 
 float EdgeCounterSensor::get_setup_priority() const { return setup_priority::DATA; }
@@ -29,7 +57,8 @@ void EdgeCounterSensor::dump_config() {
 
 void EdgeCounterSensor::loop() {
   // print durations from the buffer, but not backwards
-  int32_t temp_duration_array[];  // need this to reverse our buffer read out.
+
+  int32_t temp_duration_array[100];  // need this to reverse our buffer read out.
   uint8_t num_items{0};
   int32_t duration{0};
   while (this->store_.edge_count > 0) {
@@ -56,12 +85,11 @@ void EdgeCounterSensor::loop() {
 
 void IRAM_ATTR EdgeCounterSensorStore::gpio_intr(EdgeCounterSensorStore *arg) {
   uint32_t now = micros();
-  const bool new_level = arg->rx_pin.digital_read();
-  if (new_level == arg->last_level)
-    return;  // we didn't change level. Why?
+  const bool new_level = arg->rx_pin.digital_read();  // this is after the edge, so level is opposite
   arg->edge_count = arg->edge_count + 1;
-  arg->duration_buffer[arg->edge_count - 1] = (now - arg->last_time) * (new_level == true ? 1 : -1);
+  arg->duration_buffer[arg->edge_count - 1] = (now - arg->last_time) * (arg->last_level == true ? 1 : -1);
   arg->last_time = now;
+  arg->last_level = new_level;
 }
 
 }  // namespace edge_counter
